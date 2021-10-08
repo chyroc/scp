@@ -142,7 +142,8 @@ func (r *protocol) uploadAnyFile(client *ssh.Client, src, dest string, opt *Opti
 	}
 
 	if srcInfo.IsDir() {
-		return r.sendDir(srcInfo.Mode(), src, func() error {
+		r.trigger(TriggerBeforeSendDir, src, dest, &TriggerOption{})
+		err = r.sendDir(srcInfo.Mode(), src, func() error {
 			fs, err := os.ReadDir(src)
 			if err != nil {
 				return err
@@ -155,28 +156,42 @@ func (r *protocol) uploadAnyFile(client *ssh.Client, src, dest string, opt *Opti
 			}
 			return nil
 		})
+		r.trigger(TriggerAfterSendDir, src, dest, &TriggerOption{Err: err})
+		return err
 	} else if (srcInfo.Mode()&os.ModeSymlink != 0) && opt.SymbolicLink {
+		r.trigger(TriggerBeforeSendFile, src, dest, &TriggerOption{})
 		link, err := os.Readlink(src)
 		opt.log("is_link=%q -> %q", srcInfo.Name(), link)
 		if err != nil {
+			r.trigger(TriggerAfterSendFile, src, dest, &TriggerOption{Err: err})
 			return err
 		}
-		return sshCreateSymbolicLink(client, link, dest)
+		doChanged, err := sshCreateSymbolicLink(client, link, dest)
+		r.trigger(TriggerAfterSendFile, src, dest, &TriggerOption{Skip: !doChanged, Err: err})
+		return err
 	} else {
+		r.trigger(TriggerBeforeSendFile, src, dest, &TriggerOption{})
 		srcFile, err := os.Open(src)
 		if err != nil {
+			r.trigger(TriggerAfterSendFile, src, dest, &TriggerOption{Err: err})
 			return err
 		}
 
 		if opt.SkipMd5EqualFile {
 			localMd5, _ := localGetFileMd5(src)
 			sshMd5, _ := sshGetFileMd5(client, dest)
+			// fmt.Println(src,localMd5)
+			// fmt.Println(dest,sshMd5)
+			// fmt.Println(sshMd5 != "" , localMd5 == sshMd5,sshMd5 != "" && localMd5 == sshMd5)
 			if sshMd5 != "" && localMd5 == sshMd5 {
+				r.trigger(TriggerAfterSendFile, src, dest, &TriggerOption{Skip: true})
 				return nil
 			}
 		}
 
-		return r.sendFile(srcInfo.Mode(), srcInfo.Size(), src, srcFile)
+		err = r.sendFile(srcInfo.Mode(), srcInfo.Size(), src, srcFile)
+		r.trigger(TriggerAfterSendFile, src, dest, &TriggerOption{Err: err})
+		return err
 	}
 }
 

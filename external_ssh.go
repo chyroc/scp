@@ -8,9 +8,19 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func sshCreateSymbolicLink(cli *ssh.Client, source, target string) error {
-	_, err := sshRunCommand(cli, fmt.Sprintf("ln -s %s %s", source, target))
-	return err
+func sshCreateSymbolicLink(cli *ssh.Client, source, target string) (bool, error) {
+	out, _ := sshRunCommand(cli, "ls -l "+target)
+	if out != "" {
+		if strings.Contains(out, " -> "+source) {
+			return false, nil
+		}
+		return false, fmt.Errorf("%q exist", target)
+	}
+
+	if _, err := sshRunCommand(cli, fmt.Sprintf("ln -s %s %s", source, target)); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func sshGetFileMd5(client *ssh.Client, file string) (string, error) {
