@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-func (r *UploadOption) log(msg string, args ...interface{}) {
+func (r *Option) log(msg string, args ...interface{}) {
 	if r.Logger == nil {
 		return
 	}

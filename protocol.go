@@ -31,7 +31,7 @@ type protocol struct {
 	in        io.WriteCloser
 	out       io.Reader
 	outReader *bufio.Reader
-	opt       *UploadOption
+	opt       *Option
 }
 
 func respTypeToString(b byte) string {
@@ -47,7 +47,7 @@ func respTypeToString(b byte) string {
 	}
 }
 
-func newProtocolWithSession(session *ssh.Session, opt *UploadOption) (*protocol, error) {
+func newProtocolWithSession(session *ssh.Session, opt *Option) (*protocol, error) {
 	in, err := session.StdinPipe()
 	if err != nil {
 		return nil, err
@@ -60,7 +60,7 @@ func newProtocolWithSession(session *ssh.Session, opt *UploadOption) (*protocol,
 	return newProtocol(in, out, opt)
 }
 
-func newProtocol(in io.WriteCloser, out io.Reader, opt *UploadOption) (*protocol, error) {
+func newProtocol(in io.WriteCloser, out io.Reader, opt *Option) (*protocol, error) {
 	r := &protocol{
 		in:        in,
 		out:       out,
@@ -132,7 +132,7 @@ func (r *protocol) sendFile(mode os.FileMode, size int64, name string, reader io
 	return r.readResp("send-file-end")
 }
 
-func (r *protocol) uploadAnyFile(client *ssh.Client, src, dest string, opt *UploadOption) error {
+func (r *protocol) uploadAnyFile(client *ssh.Client, src, dest string, opt *Option) error {
 	src = filepath.Clean(src)
 	dest = filepath.Clean(dest)
 
@@ -161,11 +161,19 @@ func (r *protocol) uploadAnyFile(client *ssh.Client, src, dest string, opt *Uplo
 		if err != nil {
 			return err
 		}
-		return createSymbolicLink(client, link, dest)
+		return sshCreateSymbolicLink(client, link, dest)
 	} else {
 		srcFile, err := os.Open(src)
 		if err != nil {
 			return err
+		}
+
+		if opt.SkipMd5EqualFile {
+			localMd5, _ := localGetFileMd5(src)
+			sshMd5, _ := sshGetFileMd5(client, dest)
+			if sshMd5 != "" && localMd5 == sshMd5 {
+				return nil
+			}
 		}
 
 		return r.sendFile(srcInfo.Mode(), srcInfo.Size(), src, srcFile)

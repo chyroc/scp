@@ -8,6 +8,12 @@ type SCP struct {
 	client *ssh.Client
 }
 
+type Option struct {
+	Logger           Logger // logger interface
+	SymbolicLink     bool   // if true, send link file, else target file
+	SkipMd5EqualFile bool   // if true, check file md5 if equal, if equal, skip upload file or download file
+}
+
 func NewSCP(client *ssh.Client) *SCP {
 	return &SCP{
 		client: client,

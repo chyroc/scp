@@ -5,14 +5,9 @@ import (
 	"strings"
 )
 
-type UploadOption struct {
-	Logger       Logger
-	SymbolicLink bool // if true, send link file, else target file
-}
-
-func (r *SCP) UploadFile(src, dest string, opt *UploadOption) error {
+func (r *SCP) UploadFile(src, dest string, opt *Option) error {
 	if opt == nil {
-		opt = new(UploadOption)
+		opt = new(Option)
 	}
 
 	opt.log("src=%q, dest=%q", src, dest)
@@ -20,7 +15,7 @@ func (r *SCP) UploadFile(src, dest string, opt *UploadOption) error {
 	return r.uploadAnyFile(src, dest, opt)
 }
 
-func (r *SCP) uploadAnyFile(src, dest string, opt *UploadOption) error {
+func (r *SCP) uploadAnyFile(src, dest string, opt *Option) error {
 	src = filepath.Clean(src)
 	dest = filepath.Clean(dest)
 

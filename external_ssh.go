@@ -8,12 +8,24 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func createSymbolicLink(cli *ssh.Client, source, target string) error {
-	_, err := runSshCommand(cli, fmt.Sprintf("ln -s %s %s", source, target))
+func sshCreateSymbolicLink(cli *ssh.Client, source, target string) error {
+	_, err := sshRunCommand(cli, fmt.Sprintf("ln -s %s %s", source, target))
 	return err
 }
 
-func runSshCommand(cli *ssh.Client, cmd string) (string, error) {
+func sshGetFileMd5(client *ssh.Client, file string) (string, error) {
+	out, err := sshRunCommand(client, "md5sum "+file)
+	if err != nil {
+		return "", err
+	}
+	ss := strings.Split(out, " ")
+	if len(ss) >= 2 {
+		return ss[0], nil
+	}
+	return "", fmt.Errorf("invalid md5: %q", out)
+}
+
+func sshRunCommand(cli *ssh.Client, cmd string) (string, error) {
 	s, err := cli.NewSession()
 	if err != nil {
 		return "", err
