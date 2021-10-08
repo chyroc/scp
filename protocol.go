@@ -124,6 +124,8 @@ func (r *protocol) sendFile(mode os.FileMode, size int64, name string, reader io
 		return err
 	}
 
+	// 重要：从这一句可以看出，read EOF，并不会发送 ack 消息，只有 \n 和 \x00 \x01 \x02 才会触发 ack 消息
+	// 测试过这里不 write ok，看看是否可以读到数据：读不到数据
 	r.log("send_file send \\x00")
 	if _, err := r.in.Write([]byte{respOK}); err != nil {
 		return err
@@ -195,7 +197,7 @@ func (r *protocol) uploadAnyFile(client *ssh.Client, src, dest string, opt *Opti
 	}
 }
 
-func (r *protocol) runScp(session *ssh.Session, src, dest string, f func() error) error {
+func (r *protocol) runScp(session *ssh.Session, src, dest string, mode []byte, f func() error) error {
 	dir, _ := filepath.Split(dest)
 
 	wg := new(sync.WaitGroup)
@@ -214,7 +216,8 @@ func (r *protocol) runScp(session *ssh.Session, src, dest string, f func() error
 		return err
 	}
 
-	mode := []byte("-qtp")
+	// mode := []byte("-t")
+	mode = append(mode, 'p')
 	if stat.IsDir() {
 		mode = append(mode, 'r')
 	}
@@ -266,4 +269,43 @@ func (r *protocol) readResp(msg string) error {
 		r.log("resp[%s]: unsupported %s", msg, respTypeToString(b))
 		return fmt.Errorf("unsupport response type: %c", b)
 	}
+}
+
+// download
+
+func (r *protocol) downloadAnyFile(client *ssh.Client, src, dest string, opt *Option) error {
+	return nil
+}
+
+func (r *protocol) readHeader() (*sshProtocolRespHeader, error) {
+	b, err := r.outReader.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+	switch b {
+	case respOK:
+		return &sshProtocolRespHeader{}, nil
+	case respNonFatal, respFatal:
+		m, _, err := r.outReader.ReadLine()
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf(string(m))
+	case reqDirStart:
+	case reqDirEnd:
+	case reqFile:
+	case reqTime:
+	default:
+		return nil, fmt.Errorf("unsupport response type: %c", b)
+	}
+
+	// TODO
+	return nil, err
+}
+
+type sshProtocolRespHeader struct{}
+
+func (r *protocol) writeOk() error {
+	_, err := r.in.Write([]byte{respOK})
+	return err
 }

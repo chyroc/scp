@@ -28,7 +28,7 @@ func (r *SCP) uploadAnyFile(src, dest string, opt *Option) error {
 		return err
 	}
 
-	return p.runScp(s, src, dest, func() error {
+	return p.runScp(s, src, dest, []byte("-t"), func() error {
 		if err := p.readResp("start"); err != nil {
 			return err
 		}
